@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Trash2, Check, X, Settings, Clock } from 'lucide-react';
+import { Plus, Edit, Trash2, Check, X, Settings, Clock, Image as ImageIcon, XCircle } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import { LucideProps } from 'lucide-react';
 import { AppItem } from '../types';
@@ -25,6 +25,7 @@ interface FormData {
   icon: string;
   color: string;
   showTextOnly: boolean;
+  backgroundImageUrl?: string;
 }
 
 const ToolsPanel: React.FC<ToolsPanelProps> = ({ 
@@ -41,13 +42,15 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
     url: '',
     icon: 'app-window',
     color: '#475569',
-    showTextOnly: false
+    showTextOnly: false,
+    backgroundImageUrl: undefined
   });
   const [isEditing, setIsEditing] = useState(false);
   const [showIcons, setShowIcons] = useState(false);
   const [searchIcon, setSearchIcon] = useState('');
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get timezone list
   const timezones = useMemo(() => {
@@ -87,10 +90,14 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
       url: '',
       icon: 'app-window',
       color: '#475569',
-      showTextOnly: false
+      showTextOnly: false,
+      backgroundImageUrl: undefined
     });
     setIsEditing(false);
     setSelectedAppId(null);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
   };
 
   // Load app data for editing
@@ -101,10 +108,14 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
       url: app.url,
       icon: app.icon,
       color: app.color || '#475569',
-      showTextOnly: app.showTextOnly || false
+      showTextOnly: app.showTextOnly || false,
+      backgroundImageUrl: app.backgroundImageUrl
     });
     setIsEditing(true);
     setSelectedAppId(app.id);
+    if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
   };
 
   // Delete an app
@@ -128,7 +139,8 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
       url: formData.url,
       icon: formData.icon,
       color: formData.color,
-      showTextOnly: formData.showTextOnly
+      showTextOnly: formData.showTextOnly,
+      backgroundImageUrl: formData.backgroundImageUrl
     };
 
     let updatedApps;
@@ -140,6 +152,37 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
     
     onAppsChange(updatedApps);
     resetForm();
+  };
+
+  // Handle file selection and convert to Data URL
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, backgroundImageUrl: reader.result as string });
+      }
+      reader.onerror = (error) => {
+        console.error("Error reading file:", error);
+        alert("Error reading file. Please try again.");
+        setFormData({ ...formData, backgroundImageUrl: undefined });
+        if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+        }
+      }
+      reader.readAsDataURL(file);
+    } else {
+        // If no file is selected (e.g., user cancels), clear the image URL
+        setFormData({ ...formData, backgroundImageUrl: undefined });
+    }
+  };
+
+  // Remove background image
+  const removeBackgroundImage = () => {
+    setFormData({ ...formData, backgroundImageUrl: undefined });
+    if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
   };
 
   // Handle clicking outside the panel to close it
@@ -292,8 +335,50 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
                 type="color"
                 className="p-1 border rounded h-10 w-full"
                 value={formData.color}
-                onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, color: e.target.value, backgroundImageUrl: undefined })}
               />
+            </div>
+            
+            <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Card Background</label>
+                <div className="flex items-center space-x-4">
+                    <div className="flex-1">
+                        <label htmlFor="color-picker" className="block text-xs font-medium text-gray-500 mb-1">Color</label>
+                        <input
+                            id="color-picker"
+                            type="color"
+                            className="p-1 border rounded h-10 w-full"
+                            value={formData.color}
+                            onChange={(e) => setFormData({ ...formData, color: e.target.value, backgroundImageUrl: undefined })}
+                            title="Select background color (clears image)"
+                        />
+                    </div>
+                     <div className="text-sm text-gray-500">OR</div>
+                    <div className="flex-1">
+                        <label htmlFor="image-upload" className="block text-xs font-medium text-gray-500 mb-1">Image</label>
+                        <input
+                            ref={fileInputRef}
+                            id="image-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleFileChange}
+                            className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-slate-50 file:text-slate-700 hover:file:bg-slate-100"
+                        />
+                    </div>
+                </div>
+                {formData.backgroundImageUrl && (
+                    <div className="mt-2 flex items-center space-x-2">
+                        <img src={formData.backgroundImageUrl} alt="Background preview" className="h-10 w-10 object-cover rounded border" />
+                        <button 
+                            type="button" 
+                            onClick={removeBackgroundImage}
+                            className="p-1 text-red-600 hover:bg-red-100 rounded-full"
+                            title="Remove background image"
+                        >
+                            <XCircle className="h-5 w-5" />
+                        </button>
+                    </div>
+                )}
             </div>
             
             <div className="mb-4">
@@ -347,9 +432,11 @@ const ToolsPanel: React.FC<ToolsPanelProps> = ({
                 >
                   <div 
                     className="h-10 w-10 flex items-center justify-center rounded mr-3"
-                    style={{ backgroundColor: app.color || '#475569' }}
+                    style={app.backgroundImageUrl 
+                           ? { backgroundImage: `url(${app.backgroundImageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } 
+                           : { backgroundColor: app.color || '#475569' }}
                   >
-                    {ListItemIcon && <ListItemIcon className="h-6 w-6 text-white" />}
+                    {ListItemIcon && !app.backgroundImageUrl && <ListItemIcon className="h-6 w-6 text-white" />} 
                   </div>
                   
                   <div className="flex-1 min-w-0">
